@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <h2>Decrypting Link...</h2>
+    <script>
+        (async () => {
+            const secret = "8Pq8tt9XOnoXVeZ0xOzookrvC03H8wGt";
+            const params = new URLSearchParams(window.location.hash.substring(1));
+            const ciphertext = params.get('d');
+            const ivHex = params.get('i');
+
+            if (!ciphertext || !ivHex) {
+                document.body.innerHTML = "Invalid Link.";
+                return;
+            }
+
+            // Convert Hex IV back to Uint8Array
+            const iv = new Uint8Array(ivHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+            const enc = new TextEncoder();
+            const key = await crypto.subtle.importKey("raw", enc.encode(secret), "AES-GCM", false, ["decrypt"]);
+
+            try {
+                // Decode from Base64
+                const binaryStr = atob(decodeURIComponent(ciphertext));
+                const data = new Uint8Array([...binaryStr].map(char => char.charCodeAt(0)));
+                
+                // Decrypt
+                const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
+                const decodedUrl = new TextDecoder().decode(decrypted);
+
+                // Redirect to the actual URL
+                window.location.href = decodedUrl;
+            } catch (e) {
+                document.body.innerHTML = "Decryption failed. Wrong secret key.";
+            }
+        })();
+    </script>
+</body>
+</html>
