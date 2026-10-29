@@ -1,39 +1,62 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Redirecting...</title>
+</head>
 <body>
-    <h2>Decrypting Link...</h2>
+    <p id="status">Decrypting and redirecting...</p>
+
     <script>
-        (async () => {
-            const secret = "8Pq8tt9XOnoXVeZ0xOzookrvC03H8wGt";
-            const params = new URLSearchParams(window.location.hash.substring(1));
+        const SECRET = "8Pq8tt9XOnoXVeZ0xOzookrvC03H8wGt";
+
+        async function decryptAndRedirect() {
+            const params = new URLSearchParams(window.location.search);
             const ciphertext = params.get('d');
             const ivHex = params.get('i');
+            const statusCode = parseInt(params.get('s'), 10) || 301;
 
             if (!ciphertext || !ivHex) {
-                document.body.innerHTML = "Invalid Link.";
+                document.getElementById('status').innerText = "Invalid Request: Missing parameters.";
                 return;
             }
 
-            // Convert Hex IV back to Uint8Array
-            const iv = new Uint8Array(ivHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-            const enc = new TextEncoder();
-            const key = await crypto.subtle.importKey("raw", enc.encode(secret), "AES-GCM", false, ["decrypt"]);
-
             try {
-                // Decode from Base64
-                const binaryStr = atob(decodeURIComponent(ciphertext));
-                const data = new Uint8Array([...binaryStr].map(char => char.charCodeAt(0)));
+                const enc = new TextEncoder();
+                const keyMaterial = enc.encode(SECRET.trim());
                 
-                // Decrypt
-                const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, data);
-                const decodedUrl = new TextDecoder().decode(decrypted);
+                const key = await crypto.subtle.importKey(
+                    "raw",
+                    keyMaterial,
+                    "AES-GCM",
+                    false,
+                    ["decrypt"]
+                );
 
-                // Redirect to the actual URL
-                window.location.href = decodedUrl;
+                const iv = new Uint8Array(ivHex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+
+                const binaryString = atob(ciphertext);
+                const len = binaryString.length;
+                const encryptedData = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    encryptedData[i] = binaryString.charCodeAt(i);
+                }
+
+                const decrypted = await crypto.subtle.decrypt(
+                    { name: "AES-GCM", iv },
+                    key,
+                    encryptedData
+                );
+
+                const targetUrl = new TextDecoder().decode(decrypted);
+                window.location.replace(targetUrl);
+
             } catch (e) {
-                document.body.innerHTML = "Decryption failed. Wrong secret key.";
+                document.getElementById('status').innerText = "Encryption mismatch or decryption failed.";
             }
-        })();
+        }
+
+        decryptAndRedirect();
     </script>
 </body>
 </html>
